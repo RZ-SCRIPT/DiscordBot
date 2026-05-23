@@ -12,20 +12,18 @@ const app = express();
 app.use(express.json());
 
 // =========================
-// ENV CONFIG
+// ENV
 // =========================
 const API_KEY = process.env.API_KEY;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-// =========================
-// DISCORD CONFIG
-// =========================
+// SERVER DISCORD (DEV MODE)
 const GUILD_ID = "1428448696822927382";
 const CHANNEL_ID = "1507806045752266813";
 
 // =========================
-// DISCORD CLIENT
+// CLIENT
 // =========================
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
@@ -38,7 +36,7 @@ let scripts = {};
 let statsMessage = null;
 
 // =========================
-// UPDATE LIVE MESSAGE
+// UPDATE STATS
 // =========================
 async function updateStatsMessage() {
 
@@ -60,20 +58,16 @@ async function updateStatsMessage() {
     output += `\n📡 Total server: ${total}`;
 
     try {
-
         await statsMessage.edit(output);
-
     } catch (err) {
-
         console.error("Errore update stats:", err);
-
     }
 }
 
 // =========================
 // PING FROM FIVE M
 // =========================
-app.post("/ping", async (req, res) => {
+app.post("/ping", (req, res) => {
 
     const { serverId, script, key } = req.body;
 
@@ -85,47 +79,37 @@ app.post("/ping", async (req, res) => {
         scripts[script] = {};
     }
 
-    // salva ultimo ping
     scripts[script][serverId] = Date.now();
 
-    // update immediato
     updateStatsMessage();
 
     res.sendStatus(200);
 });
 
 // =========================
-// CLEANUP OFFLINE SERVERS
+// CLEANUP OFFLINE
 // =========================
 setInterval(() => {
 
     const now = Date.now();
-
     let changed = false;
 
     for (const script in scripts) {
 
         for (const serverId in scripts[script]) {
 
-            // offline dopo 60 sec
             if (now - scripts[script][serverId] > 60000) {
-
                 delete scripts[script][serverId];
-
                 changed = true;
             }
         }
 
-        // remove empty scripts
         if (Object.keys(scripts[script]).length === 0) {
-
             delete scripts[script];
-
             changed = true;
         }
     }
 
-    // update solo se cambia qualcosa
     if (changed) {
         updateStatsMessage();
     }
@@ -149,7 +133,7 @@ const commands = [
 ];
 
 // =========================
-// REGISTER SLASH COMMANDS
+// REGISTER SLASH (NO DUPLICATI FIX)
 // =========================
 const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
 
@@ -157,36 +141,37 @@ const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
 
     try {
 
-        console.log("Registrazione slash commands...");
+        console.log("Pulizia vecchi slash commands...");
 
         await rest.put(
-            Routes.applicationGuildCommands(
-                CLIENT_ID,
-                GUILD_ID
-            ),
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: [] }
+        );
+
+        console.log("Vecchi commands rimossi");
+
+        console.log("Registrazione nuovi slash commands...");
+
+        await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
             { body: commands }
         );
 
         console.log("Slash commands registrati!");
 
     } catch (err) {
-
         console.error("Errore slash commands:", err);
-
     }
-
 })();
 
 // =========================
-// SLASH COMMAND HANDLER
+// INTERACTION HANDLER
 // =========================
 client.on("interactionCreate", async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
-    // =========================
     // /stats
-    // =========================
     if (interaction.commandName === "stats") {
 
         let output = "📊 RZ SCRIPT STATS\n\n";
@@ -210,15 +195,12 @@ client.on("interactionCreate", async interaction => {
         });
     }
 
-    // =========================
     // /total
-    // =========================
     if (interaction.commandName === "total") {
 
         let total = 0;
 
         for (const servers of Object.values(scripts)) {
-
             total += Object.keys(servers).length;
         }
 
@@ -242,26 +224,20 @@ client.on("ready", async () => {
             return;
         }
 
-        // crea messaggio iniziale
         statsMessage = await channel.send("📊 Avvio statistiche...");
 
-        // update immediato
         updateStatsMessage();
 
     } catch (err) {
-
         console.error("Errore canale:", err);
-
     }
 });
 
 // =========================
-// START EXPRESS API
+// EXPRESS
 // =========================
 app.listen(3000, () => {
-
     console.log("API online sulla porta 3000");
-
 });
 
 // =========================
