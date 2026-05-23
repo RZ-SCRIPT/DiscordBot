@@ -1,5 +1,5 @@
 {
-  "name": "rz-bot",
+  "name": "rz-tracker",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
