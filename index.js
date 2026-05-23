@@ -133,4 +133,4 @@ app.listen(3000, () => {
 // =========================
 // LOGIN
 // =========================
-client.login(DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN);
