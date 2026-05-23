@@ -74,7 +74,7 @@ const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
         console.log("Registrazione slash commands...");
 
         await rest.put(
-            Routes.applicationCommands(CLIENT_ID),
+            Routes.applicationGuildCommands(CLIENT_ID, "1428448696822927382")
             { body: commands }
         );
 
