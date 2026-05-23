@@ -5,33 +5,76 @@ const app = express();
 app.use(express.json());
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-let servers = new Set();
 const API_KEY = "RZ-SCRIPT_SECRET";
 
+// 🔴 storage multi-script
+let scripts = {};
+
+// =========================
+// PING FROM FIVE M
+// =========================
 app.post("/ping", (req, res) => {
-    if (req.body.key !== API_KEY) return res.sendStatus(401);
+    const { serverId, script, key } = req.body;
 
-    servers.add(req.body.serverId);
+    if (key !== API_KEY) return res.sendStatus(401);
 
+    if (!scripts[script]) {
+        scripts[script] = new Set();
+    }
+
+    scripts[script].add(serverId);
+
+    // timeout 60 sec inactivity
     setTimeout(() => {
-        servers.delete(req.body.serverId);
+        scripts[script].delete(serverId);
     }, 60000);
 
     res.sendStatus(200);
 });
 
-client.on("ready", () => {
-    console.log("Bot online");
-});
+// =========================
+// DISCORD COMMAND
+// =========================
+client.on("scriptonline", msg => {
 
-client.on("messageCreate", msg => {
-    if (msg.content === "!servers") {
-        msg.reply("Server attivi: " + servers.size);
+    if (msg.content === "!stats") {
+
+        let output = "📊 RZ SCRIPT STATS\n\n";
+
+        for (const [name, set] of Object.entries(scripts)) {
+            output += `${name}: ${set.size} server\n`;
+        }
+
+        msg.reply("```\n" + output + "```");
+    }
+
+    if (msg.content === "!total") {
+        let total = 0;
+
+        for (const set of Object.values(scripts)) {
+            total += set.size;
+        }
+
+        msg.reply("Server totali attivi: " + total);
     }
 });
 
-app.listen(3000);
+client.on("ready", () => {
+    console.log("Bot online: " + client.user.tag);
+});
+
+// =========================
+// START SERVER
+// =========================
+app.listen(3000, () => {
+    console.log("API online sulla porta 3000");
+});
+
 client.login("MTUwNzc5MDc3MjQyOTEyNzg2MQ.GI-pfz.D6_O7wJKrsldUpT9RX1THUQr6gl95q5HAQD9nM");
