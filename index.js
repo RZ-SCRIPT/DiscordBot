@@ -1,9 +1,9 @@
-const { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder 
+const {
+    Client,
+    GatewayIntentBits,
+    REST,
+    Routes,
+    SlashCommandBuilder
 } = require("discord.js");
 
 const express = require("express");
@@ -12,11 +12,12 @@ const app = express();
 app.use(express.json());
 
 // =========================
-// CONFIG (USA ENV SU RENDER)
+// ENV CONFIG (RENDER)
 // =========================
 const API_KEY = process.env.API_KEY;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = "1428448696822927382"; // tuo server discord
 
 // =========================
 // DISCORD CLIENT
@@ -26,7 +27,7 @@ const client = new Client({
 });
 
 // =========================
-// STORAGE
+// STORAGE SERVER
 // =========================
 let scripts = {};
 
@@ -44,7 +45,7 @@ app.post("/ping", (req, res) => {
 
     scripts[script].add(serverId);
 
-    // rimuove dopo 60s inattività
+    // remove after 60s inactivity
     setTimeout(() => {
         scripts[script].delete(serverId);
     }, 60000);
@@ -53,12 +54,12 @@ app.post("/ping", (req, res) => {
 });
 
 // =========================
-// SLASH COMMAND REGISTRATION
+// SLASH COMMANDS
 // =========================
 const commands = [
     new SlashCommandBuilder()
         .setName("stats")
-        .setDescription("Mostra server attivi per ogni script")
+        .setDescription("Mostra server attivi per script")
         .toJSON(),
 
     new SlashCommandBuilder()
@@ -67,6 +68,9 @@ const commands = [
         .toJSON()
 ];
 
+// =========================
+// REGISTER SLASH COMMANDS
+// =========================
 const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
 
 (async () => {
@@ -74,18 +78,21 @@ const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
         console.log("Registrazione slash commands...");
 
         await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, "1428448696822927382")
+            Routes.applicationGuildCommands(
+                CLIENT_ID,
+                GUILD_ID
+            ),
             { body: commands }
         );
 
         console.log("Slash commands registrati!");
     } catch (err) {
-        console.error(err);
+        console.error("Errore slash commands:", err);
     }
 })();
 
 // =========================
-// SLASH COMMAND HANDLER
+// INTERACTION HANDLER
 // =========================
 client.on("interactionCreate", async interaction => {
 
@@ -100,7 +107,10 @@ client.on("interactionCreate", async interaction => {
             output += `${name}: ${set.size} server\n`;
         }
 
-        return interaction.reply("```\n" + output + "```");
+        return interaction.reply({
+            content: "```\n" + output + "```",
+            ephemeral: false
+        });
     }
 
     // /total
@@ -112,7 +122,7 @@ client.on("interactionCreate", async interaction => {
             total += set.size;
         }
 
-        return interaction.reply(`Server totali attivi: ${total}`);
+        return interaction.reply(`📡 Server totali attivi: ${total}`);
     }
 });
 
@@ -120,17 +130,17 @@ client.on("interactionCreate", async interaction => {
 // READY
 // =========================
 client.on("ready", () => {
-    console.log("Bot online: " + client.user.tag);
+    console.log("Bot online:", client.user.tag);
 });
 
 // =========================
-// API START
+// START EXPRESS API
 // =========================
 app.listen(3000, () => {
     console.log("API online sulla porta 3000");
 });
 
 // =========================
-// LOGIN
+// LOGIN DISCORD
 // =========================
-client.login(process.env.DISCORD_TOKEN);
+client.login(DISCORD_TOKEN);
