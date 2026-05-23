@@ -18,7 +18,9 @@ const API_KEY = process.env.API_KEY;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-// SERVER DISCORD (DEV MODE)
+// =========================
+// DISCORD SETTINGS
+// =========================
 const GUILD_ID = "1428448696822927382";
 const CHANNEL_ID = "1507806045752266813";
 
@@ -34,32 +36,23 @@ const client = new Client({
 // =========================
 let scripts = {};
 let statsMessage = null;
+let statsChannel = null;
 
 // =========================
-// UPDATE STATS
+// BUILD STATS TEXT
 // =========================
-async function updateStatsMessage() {
+function buildStats() {
 
-    if (!statsMessage) return;
-
-    let output = "📊 **RZ SCRIPT STATS**\n\n";
-
-    let total = 0;
+    let output = "📊 RZ SCRIPT STATS\n\n";
 
     for (const [name, servers] of Object.entries(scripts)) {
 
         const count = Object.keys(servers).length;
 
         output += `🔹 ${name}: ${count} server\n`;
-
-        total += count;
     }
 
-    try {
-        await statsMessage.edit(output);
-    } catch (err) {
-        console.error("Errore update stats:", err);
-    }
+    return output;
 }
 
 // =========================
@@ -79,8 +72,6 @@ app.post("/ping", (req, res) => {
 
     scripts[script][serverId] = Date.now();
 
-    updateStatsMessage();
-
     res.sendStatus(200);
 });
 
@@ -90,7 +81,6 @@ app.post("/ping", (req, res) => {
 setInterval(() => {
 
     const now = Date.now();
-    let changed = false;
 
     for (const script in scripts) {
 
@@ -98,18 +88,12 @@ setInterval(() => {
 
             if (now - scripts[script][serverId] > 60000) {
                 delete scripts[script][serverId];
-                changed = true;
             }
         }
 
         if (Object.keys(scripts[script]).length === 0) {
             delete scripts[script];
-            changed = true;
         }
-    }
-
-    if (changed) {
-        updateStatsMessage();
     }
 
 }, 5000);
@@ -122,33 +106,17 @@ const commands = [
     new SlashCommandBuilder()
         .setName("stats")
         .setDescription("Mostra statistiche script")
-        .toJSON(),
-
-    new SlashCommandBuilder()
-        .setName("total")
-        .setDescription("Mostra totale server")
         .toJSON()
 ];
 
 // =========================
-// REGISTER SLASH (NO DUPLICATI FIX)
+// REGISTER SLASH
 // =========================
 const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
 
 (async () => {
 
     try {
-
-        console.log("Pulizia vecchi slash commands...");
-
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: [] }
-        );
-
-        console.log("Vecchi commands rimossi");
-
-        console.log("Registrazione nuovi slash commands...");
 
         await rest.put(
             Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
@@ -158,76 +126,58 @@ const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
         console.log("Slash commands registrati!");
 
     } catch (err) {
-        console.error("Errore slash commands:", err);
+        console.error(err);
     }
+
 })();
 
 // =========================
-// INTERACTION HANDLER
+// INTERACTIONS
 // =========================
 client.on("interactionCreate", async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
-    // /stats
     if (interaction.commandName === "stats") {
 
-        let output = "📊 RZ SCRIPT STATS\n\n";
-
-        let total = 0;
-
-        for (const [name, servers] of Object.entries(scripts)) {
-
-            const count = Object.keys(servers).length;
-
-            output += `🔹 ${name}: ${count} server\n`;
-
-            total += count;
-        }
-
-
         return interaction.reply({
-            content: "```" + output + "```",
+            content: "```" + buildStats() + "```",
             ephemeral: false
         });
-    }
-
-    // /total
-    if (interaction.commandName === "total") {
-
-        let total = 0;
-
-        for (const servers of Object.values(scripts)) {
-            total += Object.keys(servers).length;
-        }
-
-        return interaction.reply(`📡 Total server: ${total}`);
     }
 });
 
 // =========================
-// READY
+// READY + MESSAGE LOOP
 // =========================
 client.on("ready", async () => {
 
     console.log("Bot online:", client.user.tag);
 
-    try {
+    statsChannel = await client.channels.fetch(CHANNEL_ID);
 
-        const channel = await client.channels.fetch(CHANNEL_ID);
-
-        if (!channel) {
-            console.log("Canale stats non trovato");
-            return;
-        }
-
-        statsMessage = await channel.send("📊 Avvio statistiche...");
-
-        updateStatsMessage();
-
-    } catch (err) {
-        console.error("Errore canale:", err);
+    if (!statsChannel) {
+        console.log("Canale non trovato");
+        return;
     }
+
+    async function refreshMessage() {
+
+        try {
+
+            if (statsMessage) {
+                await statsMessage.delete().catch(() => {});
+            }
+
+            statsMessage = await statsChannel.send(buildStats());
+
+        } catch (err) {
+            console.error("Errore refresh message:", err);
+        }
+    }
+
+    await refreshMessage();
+    setInterval(refreshMessage, 60000);
 });
 
 // =========================
