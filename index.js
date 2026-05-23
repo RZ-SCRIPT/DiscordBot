@@ -1,20 +1,33 @@
-const { Client, GatewayIntentBits } = require("discord.js");
+const { 
+    Client, 
+    GatewayIntentBits, 
+    REST, 
+    Routes, 
+    SlashCommandBuilder 
+} = require("discord.js");
+
 const express = require("express");
 
 const app = express();
 app.use(express.json());
 
+// =========================
+// CONFIG (USA ENV SU RENDER)
+// =========================
+const API_KEY = process.env.API_KEY;
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+
+// =========================
+// DISCORD CLIENT
+// =========================
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+    intents: [GatewayIntentBits.Guilds]
 });
 
-const API_KEY = "RZ-SCRIPT_SECRET";
-
-// 🔴 storage multi-script
+// =========================
+// STORAGE
+// =========================
 let scripts = {};
 
 // =========================
@@ -31,7 +44,7 @@ app.post("/ping", (req, res) => {
 
     scripts[script].add(serverId);
 
-    // timeout 60 sec inactivity
+    // rimuove dopo 60s inattività
     setTimeout(() => {
         scripts[script].delete(serverId);
     }, 60000);
@@ -40,11 +53,46 @@ app.post("/ping", (req, res) => {
 });
 
 // =========================
-// DISCORD COMMAND
+// SLASH COMMAND REGISTRATION
 // =========================
-client.on("scriptonline", msg => {
+const commands = [
+    new SlashCommandBuilder()
+        .setName("stats")
+        .setDescription("Mostra server attivi per ogni script")
+        .toJSON(),
 
-    if (msg.content === "!stats") {
+    new SlashCommandBuilder()
+        .setName("total")
+        .setDescription("Mostra totale server attivi")
+        .toJSON()
+];
+
+const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
+
+(async () => {
+    try {
+        console.log("Registrazione slash commands...");
+
+        await rest.put(
+            Routes.applicationCommands(CLIENT_ID),
+            { body: commands }
+        );
+
+        console.log("Slash commands registrati!");
+    } catch (err) {
+        console.error(err);
+    }
+})();
+
+// =========================
+// SLASH COMMAND HANDLER
+// =========================
+client.on("interactionCreate", async interaction => {
+
+    if (!interaction.isChatInputCommand()) return;
+
+    // /stats
+    if (interaction.commandName === "stats") {
 
         let output = "📊 RZ SCRIPT STATS\n\n";
 
@@ -52,29 +100,37 @@ client.on("scriptonline", msg => {
             output += `${name}: ${set.size} server\n`;
         }
 
-        msg.reply("```\n" + output + "```");
+        return interaction.reply("```\n" + output + "```");
     }
 
-    if (msg.content === "!total") {
+    // /total
+    if (interaction.commandName === "total") {
+
         let total = 0;
 
         for (const set of Object.values(scripts)) {
             total += set.size;
         }
 
-        msg.reply("Server totali attivi: " + total);
+        return interaction.reply(`Server totali attivi: ${total}`);
     }
 });
 
+// =========================
+// READY
+// =========================
 client.on("ready", () => {
     console.log("Bot online: " + client.user.tag);
 });
 
 // =========================
-// START SERVER
+// API START
 // =========================
 app.listen(3000, () => {
     console.log("API online sulla porta 3000");
 });
 
-client.login("MTUwNzc5MDc3MjQyOTEyNzg2MQ.GI-pfz.D6_O7wJKrsldUpT9RX1THUQr6gl95q5HAQD9nM");
+// =========================
+// LOGIN
+// =========================
+client.login(DISCORD_TOKEN);
