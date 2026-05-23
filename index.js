@@ -55,8 +55,6 @@ async function updateStatsMessage() {
         total += count;
     }
 
-    output += `\n📡 Total server: ${total}`;
-
     try {
         await statsMessage.edit(output);
     } catch (err) {
@@ -187,7 +185,6 @@ client.on("interactionCreate", async interaction => {
             total += count;
         }
 
-        output += `\n📡 Total server: ${total}`;
 
         return interaction.reply({
             content: "```" + output + "```",
